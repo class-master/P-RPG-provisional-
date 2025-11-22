@@ -1,0 +1,14 @@
+{
+  "slime": {
+    "name": "スライム",
+    "max_hp": 15,
+    "attack": 4,
+    "defense": 0
+  },
+  "goblin": {
+    "name": "ゴブリン",
+    "max_hp": 25,
+    "attack": 6,
+    "defense": 1
+  }
+}
