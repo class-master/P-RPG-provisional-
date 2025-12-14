@@ -346,3 +346,4 @@ def on_key_press(key: str) -> None:
 - 今日できたこと：
 
 - 次にやりたいこと（Day4 への宿題案など）：
+NPC クラスを作る
