@@ -1,96 +1,296 @@
 # -*- coding: utf-8 -*-
 """
-Day2 エンティティ（STUDENT版）：Player/Camera/HUDの骨格＋TODO
------------------------------------------------------------
-- ここから“走る／スタミナ／慣性／摩擦／衝突／HUD”を **段階導入**。
-- まずは **移動→描画だけ** 完走できればOK。あとから一つずつ足す。
+RPG Rustic Master B — Day2（生徒用）Kivy
+到達：壁衝突／Eで看板を読む（会話ダミー）
+発展：走る(Shift)／スタミナ／慣性／摩擦／宝箱／鍵と扉
 
-実装ガイド（こう書くと良いよ例）：
-- 慣性: vel = vel*(1-ACCEL) + 目標速度*ACCEL
-- 摩擦: vel *= FRICTION
-- スタミナ: 走行中に減少、非走行時に回復（最大/最小でクリップ）
-- 衝突: X→判定→巻戻し／Y→判定→巻戻し（軸分離）
+ポイント（Kivy版の“pygame風”分割）
+- Player : 入力→速度→移動（衝突は軸分離）
+- Camera : プレイヤー追従（offset = cam）
+- HUD    : 画面固定（Windowサイズに追従して、絶対に見える）
 """
-import pygame
-from pygame import Surface
-from config import (
-    TILE_SIZE, PLAYER_SPEED, RUN_MULTIPLIER, PLAYER_ACCEL, PLAYER_FRICTION,
-    STAMINA_MAX, STAMINA_RUN_COST, STAMINA_RECOVER, HP_MAX,
-    WHITE, GREEN, YELLOW, BLUE
-)
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self, pos_px):
-        super().__init__()
-        self.image = Surface((TILE_SIZE - 6, TILE_SIZE - 6), pygame.SRCALPHA)
-        self.image.fill(BLUE)
-        self.rect = self.image.get_rect(topleft=pos_px)
+from kivy.app import App
+from kivy.uix.widget import Widget
+from kivy.core.window import Window
+from kivy.clock import Clock
+from kivy.graphics import Color, Rectangle, PushMatrix, PopMatrix, Translate
+from kivy.uix.label import Label
+from kivy.properties import ListProperty
 
-        # ベクトル（慣性＆摩擦に使う）
-        self.vel = pygame.math.Vector2(0, 0)
+from config import WIDTH, HEIGHT, TILE_SIZE, MAP_CSV, PLAYER_SPEED, BG
+from map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
 
-        self.hp = HP_MAX
+# ✅ HUDが画面外に飛ぶ事故を防止（WidgetサイズではなくWindowサイズを固定）
+Window.size = (WIDTH, HEIGHT)
+
+# --- 追加要素（configに無い前提で、ここで“講義用に”定数化） ---
+RUN_MULTIPLIER = 1.8       # Shiftで走る倍率
+STAMINA_MAX = 100.0        # スタミナ最大
+STAMINA_RUN_COST = 0.9     # 走行中の減少（毎フレーム）
+STAMINA_RECOVER = 0.6      # 非走行時の回復（毎フレーム）
+PLAYER_ACCEL = 0.25        # 慣性の追従率（0〜1）
+PLAYER_FRICTION = 0.88     # 摩擦（0〜1、1に近いほど滑る）
+
+SOLID_TILES = {1, 2, 3, 4} # 壁扱いタイルID（必要に応じて調整）
+
+
+def rect_collides(px, py, w, h, grid, solid=SOLID_TILES):
+    """
+    タイル衝突（矩形 vs 壁タイル）判定
+    - px,py,w,h は “ワールド座標（ピクセル）”
+    - grid は CSVのタイルID配列（grid[row][col]）
+    """
+    ts = TILE_SIZE
+    cols = len(grid[0])
+    rows = len(grid)
+
+    # プレイヤー矩形が占めるタイル範囲だけ調べる（高速）
+    min_c = max(0, int(px) // ts)
+    max_c = min(cols - 1, int((px + w - 1)) // ts)
+    min_r = max(0, int(py) // ts)
+    max_r = min(rows - 1, int((py + h - 1)) // ts)
+
+    for r in range(min_r, max_r + 1):
+        for c in range(min_c, max_c + 1):
+            if grid[r][c] in solid:
+                wx, wy = c * ts, r * ts
+                # AABB（矩形）の重なり
+                if not (px + w <= wx or wx + ts <= px or py + h <= wy or wy + ts <= py):
+                    return True
+    return False
+
+
+def aabb_intersect(ax, ay, aw, ah, bx, by, bw, bh):
+    """矩形どうし（AABB）の重なり判定"""
+    if ax + aw <= bx: return False
+    if ax >= bx + bw: return False
+    if ay + ah <= by: return False
+    if ay >= by + bh: return False
+    return True
+
+
+class Player:
+    """
+    Player（pygame風の責務）
+    - handle_input : 入力→目標速度→慣性＆摩擦
+    - move_and_collide : 移動（軸分離で衝突）
+    """
+    def __init__(self, x, y, w, h):
+        self.px = float(x)
+        self.py = float(y)
+        self.w = float(w)
+        self.h = float(h)
+
+        # 速度（慣性）
+        self.vx = 0.0
+        self.vy = 0.0
+
+        # スタミナ
         self.stamina = STAMINA_MAX
 
-    def handle_input(self, keys, running: bool):
-        move = pygame.math.Vector2(0, 0)
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:  move.x -= 1
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]: move.x += 1
-        if keys[pygame.K_UP] or keys[pygame.K_w]:    move.y -= 1
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:  move.y += 1
-        if move.length_squared() > 0:
-            move = move.normalize()
+    def handle_input(self, keys, mods):
+        """
+        keys: 押されているキーコード集合
+        mods: 修飾キー集合（'shift'等） ※環境差があるのでShiftキーコードも併用
+        """
+        left = 276; right = 275; up = 273; down = 274
+        ax = (1 if right in keys else 0) - (1 if left in keys else 0)
+        ay = (1 if down  in keys else 0) - (1 if up   in keys else 0)
 
-        # ★STEP1: まずは一定速度でOK（走る/慣性は後で）
+        # 斜め移動を速くしない（正規化）
+        if ax != 0 and ay != 0:
+            ax *= 0.7071
+            ay *= 0.7071
+
+        # Shift走り（modifierが取れない環境の保険：303/304）
+        shift_keys = {303, 304}
+        running = ('shift' in mods) or any(k in keys for k in shift_keys)
+
+        # 走り＆スタミナ
         speed = PLAYER_SPEED
+        if running and self.stamina > 0:
+            speed *= RUN_MULTIPLIER
+            self.stamina = max(0.0, self.stamina - STAMINA_RUN_COST)
+        else:
+            self.stamina = min(STAMINA_MAX, self.stamina + STAMINA_RECOVER)
 
-        # TODO(走る/スタミナ):
-        # if running and self.stamina > 0:
-        #     speed *= RUN_MULTIPLIER
-        #     self.stamina = max(0, self.stamina - STAMINA_RUN_COST)
-        # else:
-        #     self.stamina = min(STAMINA_MAX, self.stamina + STAMINA_RECOVER)
+        # 慣性（目標速度に“なめらかに”追従）
+        target_vx = ax * speed
+        target_vy = ay * speed
+        self.vx = self.vx * (1.0 - PLAYER_ACCEL) + target_vx * PLAYER_ACCEL
+        self.vy = self.vy * (1.0 - PLAYER_ACCEL) + target_vy * PLAYER_ACCEL
 
-        # TODO(慣性/摩擦) — まずは“瞬間移動”でOK、後から補間に差し替え
-        # self.vel.x = self.vel.x * (1 - PLAYER_ACCEL) + move.x * speed * PLAYER_ACCEL
-        # self.vel.y = self.vel.y * (1 - PLAYER_ACCEL) + move.y * speed * PLAYER_ACCEL
-        # self.vel *= PLAYER_FRICTION
-        # 一旦は：
-        self.vel.x = move.x * speed
-        self.vel.y = move.y * speed
+        # 摩擦（入力が切れた時に少しずつ止まる）
+        self.vx *= PLAYER_FRICTION
+        self.vy *= PLAYER_FRICTION
 
     def move_and_collide(self, grid):
-        # TODO(衝突・軸分離)：最初は“壁すり抜け”でOK → 後で実装
-        self.rect.x += int(self.vel.x)
-        self.rect.y += int(self.vel.y)
+        """
+        軸分離（超重要）
+        - Xを動かす→衝突したら巻き戻す
+        - Yを動かす→衝突したら巻き戻す
+        こうすると“角で引っかかってガタガタ”が減ります
+        """
+        # X
+        nx = self.px + self.vx
+        if not rect_collides(nx, self.py, self.w, self.h, grid):
+            self.px = nx
+        else:
+            self.vx = 0.0  # 壁に当たったらX速度を止める（わかりやすい）
 
-    def update(self, grid, keys, running):
-        self.handle_input(keys, running)
-        self.move_and_collide(grid)
+        # Y
+        ny = self.py + self.vy
+        if not rect_collides(self.px, ny, self.w, self.h, grid):
+            self.py = ny
+        else:
+            self.vy = 0.0
+
+    def rect(self):
+        return (self.px, self.py, self.w, self.h)
+
 
 class Camera:
-    def __init__(self, screen_size):
-        self.offset = pygame.math.Vector2(0, 0)
-        self.screen_w, self.screen_h = screen_size
-    def follow(self, player_rect):
-        self.offset.x = max(0, player_rect.centerx - self.screen_w // 2)
-        self.offset.y = max(0, player_rect.centery - self.screen_h // 2)
+    """プレイヤー中心追従カメラ（offset = cam）"""
+    def __init__(self, screen_w, screen_h, map_w, map_h):
+        self.cam = [0.0, 0.0]
+        self.sw = screen_w
+        self.sh = screen_h
+        self.mw = map_w
+        self.mh = map_h
+
+    def follow(self, px, py):
+        cx = px - self.sw / 2
+        cy = py - self.sh / 2
+        cam_max_x = max(0.0, self.mw - self.sw)
+        cam_max_y = max(0.0, self.mh - self.sh)
+        self.cam[0] = max(0.0, min(cx, cam_max_x))
+        self.cam[1] = max(0.0, min(cy, cam_max_y))
+
 
 class HUD:
-    def __init__(self, font):
-        self.font = font
+    """
+    画面固定HUD
+    - “看板の文字”は、看板の上に描くのではなくHUDに出す（RPG定番）
+    - Windowサイズが変わっても絶対に見えるように追従させる
+    """
+    def __init__(self):
+        self.label = Label(text="", pos=(12, Window.height - 28))
+        Window.bind(size=self._on_resize)
 
-    def draw_bar(self, screen, x, y, w, h, ratio, fg_color, bg_color=(40, 40, 40)):
-        import pygame
-        pygame.draw.rect(screen, bg_color, (x, y, w, h))
-        fill_w = int(w * max(0.0, min(1.0, ratio)))
-        pygame.draw.rect(screen, fg_color, (x, y, fill_w, h))
-        pygame.draw.rect(screen, (20,20,20), (x, y, w, h), 1)
+    def _on_resize(self, win, size):
+        self.label.pos = (12, win.height - 28)
 
-    def render(self, screen, player):
-        # TODO(HUD)：最初は非表示でOK → 後でバーを描こう
-        # self.draw_bar(screen, 16, 14, 200, 14, player.hp/float(HP_MAX), GREEN)
-        # stamina_ratio = player.stamina/float(STAMINA_MAX)
-        # color = YELLOW if stamina_ratio < 0.3 else WHITE
-        # self.draw_bar(screen, 16, 34, 200, 10, stamina_ratio, color)
-        pass
+    def set_text(self, s: str):
+        self.label.text = s
+
+
+class Game(Widget):
+    cam = ListProperty([0, 0])
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.size = (WIDTH, HEIGHT)
+
+        # マップ読み込み
+        self.grid, self.rows, self.cols = load_csv_as_tilemap(MAP_CSV)
+        self.tiles = load_tileset_regions()
+
+        # マップサイズ（ピクセル）
+        self.map_w = self.cols * TILE_SIZE
+        self.map_h = self.rows * TILE_SIZE
+
+        # Player / Camera / HUD
+        ts = TILE_SIZE
+        self.player = Player(ts * 3, ts * 3, ts - 6, ts - 6)
+        self.camera = Camera(WIDTH, HEIGHT, self.map_w, self.map_h)
+
+        self.hud = HUD()
+        self.add_widget(self.hud.label)
+
+        # 入力状態
+        self.keys = set()
+        self.mods = set()
+        Window.bind(on_key_down=self._kd, on_key_up=self._ku)
+
+        # 看板（オレンジ四角）＝“当たり判定の目印”
+        self.sign = (ts * 10, ts * 6, ts, ts)
+        self.sign_text = "ようこそ、Rustic村へ！"
+        self.sign_hold = 0.0  # 表示保持（チラつき防止）
+
+        Clock.schedule_interval(self.update, 1 / 60)
+
+    def _kd(self, win, key, scancode, codepoint, modifier):
+        self.keys.add(key)
+        self.mods = set(modifier) if modifier else set()
+        return True
+
+    def _ku(self, win, key, *a):
+        self.keys.discard(key)
+        return True
+
+    def update(self, dt):
+        # 入力→移動
+        self.player.handle_input(self.keys, self.mods)
+        self.player.move_and_collide(self.grid)
+
+        # 看板：Eで読む（接触中のみ）
+        ekey = ord('e')  # 101
+        px, py, pw, ph = self.player.rect()
+        sx, sy, sw, sh = self.sign
+        touching = aabb_intersect(px, py, pw, ph, sx, sy, sw, sh)
+
+        self.sign_hold = max(0.0, self.sign_hold - dt)
+
+        if (ekey in self.keys) and touching:
+            self.sign_hold = 0.20
+            hud_text = f"矢印で移動 / Shiftで走る / E: 看板\n【看板】{self.sign_text}"
+        else:
+            if self.sign_hold > 0.0:
+                hud_text = f"矢印で移動 / Shiftで走る / E: 看板\n【看板】{self.sign_text}"
+            else:
+                hud_text = "矢印で移動 / Shiftで走る / E: 看板"
+
+        self.hud.set_text(hud_text)
+
+        # カメラ追従（プレイヤー中心）
+        self.camera.follow(px, py)
+        self.cam[0], self.cam[1] = self.camera.cam[0], self.camera.cam[1]
+
+        self.draw()
+
+    def draw(self):
+        self.canvas.clear()
+        with self.canvas:
+            # 背景
+            Color(*BG)
+            Rectangle(pos=self.pos, size=self.size)
+
+            # ワールド描画（カメラ適用）
+            PushMatrix()
+            Translate(-self.cam[0], -self.cam[1], 0)
+
+            ts = TILE_SIZE
+            for r, row in enumerate(self.grid):
+                for c, tid in enumerate(row):
+                    Rectangle(texture=self.tiles[tid], pos=(c * ts, r * ts), size=(ts, ts))
+
+            # 看板（オレンジ）
+            Color(0.8, 0.6, 0.25, 1)
+            Rectangle(pos=(self.sign[0], self.sign[1]), size=(self.sign[2], self.sign[3]))
+
+            # プレイヤ
+            Color(0.35, 0.67, 1, 1)
+            px, py, pw, ph = self.player.rect()
+            Rectangle(pos=(px, py), size=(pw, ph))
+
+            PopMatrix()
+
+
+class Day2(App):
+    def build(self):
+        return Game()
+
+
+if __name__ == "__main__":
+    Day2().run()
