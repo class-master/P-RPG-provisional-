@@ -285,7 +285,18 @@ class Game(Widget):
             Rectangle(pos=(px, py), size=(pw, ph))
 
             PopMatrix()
+class NPC:
+    def __init__(self, name, x, y, event_id):
+        # name: NPCの名前（例: "村人A"）
+        # x, y: マップ上のタイル座標
+        # event_id: 会話イベントのID（例: "first_npc"）
+        self.name = name
+        self.x = x
+        self.y = y
+        self.event_id = event_id
+villager1 = NPC("村人１",12,5,event_id ="1")
 
+       
 
 class Day2(App):
     def build(self):
@@ -294,3 +305,9 @@ class Day2(App):
 
 if __name__ == "__main__":
     Day2().run()
+
+def is_adjacent(player, npc):
+    # プレイヤーがNPCの上下左右どこか1マス隣にいるかどうかを返す。
+    dx = abs(player.x - npc.x)
+    dy = abs(player.y - npc.y)
+    return dx + dy == 1
