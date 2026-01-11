@@ -10,5 +10,23 @@
     "max_hp": 25,
     "attack": 6,
     "defense": 1
+  },
+  "bat": {
+    "name": "コウモリ",
+    "max_hp": 18,
+    "attack": 5,
+    "defense": 0
+  },
+  "wolf": {
+    "name": "オオカミ",
+    "max_hp": 28,
+    "attack": 7,
+    "defense": 1
+  },
+  "knight": {
+    "name": "ならず者",
+    "max_hp": 35,
+    "attack": 8,
+    "defense": 2
   }
 }
