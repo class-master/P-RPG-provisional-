@@ -34,7 +34,6 @@ PLAYER_FRICTION = 0.88     # 摩擦（0〜1、1に近いほど滑る）
 
 SOLID_TILES = {1, 2, 3, 4} # 壁扱いタイルID（必要に応じて調整）
 
-
 def rect_collides(px, py, w, h, grid, solid=SOLID_TILES):
     """
     タイル衝突（矩形 vs 壁タイル）判定
@@ -60,7 +59,6 @@ def rect_collides(px, py, w, h, grid, solid=SOLID_TILES):
                     return True
     return False
 
-
 def aabb_intersect(ax, ay, aw, ah, bx, by, bw, bh):
     """矩形どうし（AABB）の重なり判定"""
     if ax + aw <= bx: return False
@@ -68,7 +66,6 @@ def aabb_intersect(ax, ay, aw, ah, bx, by, bw, bh):
     if ay + ah <= by: return False
     if ay >= by + bh: return False
     return True
-
 
 class Player:
     """
@@ -296,18 +293,17 @@ class NPC:
         self.event_id = event_id
 villager1 = NPC("村人１",12,5,event_id ="1")
 
-       
 
 class Day2(App):
     def build(self):
         return Game()
 
 
-if __name__ == "__main__":
-    Day2().run()
-
 def is_adjacent(player, npc):
     # プレイヤーがNPCの上下左右どこか1マス隣にいるかどうかを返す。
     dx = abs(player.x - npc.x)
     dy = abs(player.y - npc.y)
     return dx + dy == 1
+
+if __name__ == "__main__":
+    Day2().run()

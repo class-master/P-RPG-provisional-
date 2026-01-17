@@ -30,6 +30,7 @@ def rect_collides(px, py, w, h, grid, solid={1,2,3,4}): # ← solid引数と壁�
 
 class Game(Widget):
     cam=ListProperty([0,0])
+
     def __init__(self, **kw):
         super().__init__(**kw)
         self.size=(WIDTH,HEIGHT)
@@ -48,10 +49,12 @@ class Game(Widget):
         self.cam = [0, 0]
     def _kd(self,win,key,*a):
         self.keys.add(key); return True
+
     def _ku(self,win,key,*a):
         self.keys.discard(key); return True
+
     def update(self,dt):
-        left=276; right=275; up=273; down=274; ekey=101
+        left=276; right=275; up=274; down=273; ekey=101
         ax=(1 if right in self.keys else 0)-(1 if left in self.keys else 0)
         ay=(1 if down  in self.keys else 0)-(1 if up   in self.keys else 0)
         spd=PLAYER_SPEED
@@ -70,6 +73,7 @@ class Game(Widget):
         
         self.cam[0]=max(0,self.px-self.width/2); self.cam[1]=max(0,self.py-self.height/2)
         self.draw()
+        
     def draw(self):
         self.canvas.clear()
         with self.canvas:
@@ -87,6 +91,5 @@ class Game(Widget):
 class Day2(App):
     def build(self): return Game()
 if __name__=="__main__": Day2().run()
-
 
 #看板の文字の表示ができなかった。

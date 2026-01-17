@@ -4,11 +4,11 @@
 
 from typing import List
 
-# from entities_student import Player, NPC
-# from map_loader_kivy import load_map
-# from ui.message_window import MessageWindow
-# from events_loader import load_events
-# from entities_student import is_adjacent
+from entities_student import Player, NPC
+from map_loader_kivy import load_map
+from ui.message_window import MessageWindow
+from systems.events.events_loader import load_events
+from entities_student import is_adjacent
 
 player = None
 npcs: List[object] = []
@@ -19,14 +19,14 @@ message_window = None
 def setup_game():
     # Day3 用のフィールドとNPC、会話データを初期化する関数。
     global player, npcs, events, message_window
-    # game_map = load_map('maps/village01.map')
-    # player = Player(x=5, y=5)
-    # npcs = [
-    #     NPC('村人A', 8, 5, 'first_npc'),
-    #     NPC('お店の子', 10, 7, 'shop_girl'),
-    # ]
-    # events = load_events()
-    # message_window = MessageWindow()
+    game_map = load_map('maps/village01.map')
+    player = Player(x=5, y=5)
+    npcs = [
+        NPC('村人A', 8, 5, 'first_npc'),
+        NPC('お店の子', 10, 7, 'shop_girl'),
+    ]
+    events = load_events()
+    message_window = MessageWindow()
 
 
 def is_adjacent(player, npc) -> bool:

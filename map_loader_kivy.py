@@ -41,6 +41,9 @@ DEFAULT_TILESET_PATH: Path = (BASE_DIR / "assets/maps/rustic_tileset.png").resol
 # tileset を何度も読み直さないように簡易キャッシュ
 _tiles_cache = None  # type: ignore[assignment]
 
+# map_loader_kivy.py
+def load_map(*args, **kwargs):
+    return load_csv_as_tilemap(*args, **kwargs)
 
 # ----------------------------------------------------------------------
 # 1. CSV マップ読み込み

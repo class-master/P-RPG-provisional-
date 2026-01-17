@@ -7,11 +7,11 @@
 from typing import Optional
 
 # 実プロジェクトに合わせて import を書き換えてください。
-# from status_day4 import Status
-# from battle_engine import player_attack, enemy_attack
-# from ui.battle_window import BattleWindow
-# import json
-# from pathlib import Path
+from status_day4 import Status
+from systems.battle.battle_engine import player_attack, enemy_attack
+from ui.battle_window import BattleWindow
+import json
+from pathlib import Path
 
 mode = "field"  # "field" または "battle"
 
@@ -29,9 +29,9 @@ def setup_game():
     # player_status = Status("ゆうしゃ", max_hp=30, attack=8, defense=2)
 
     # TODO: レイアウトに合わせて BattleWindow を生成して追加する。
-    # battle_window = BattleWindow()
-    # root_layout.add_widget(battle_window)
-    # battle_window.opacity = 0  # 最初は非表示にしておく
+    battle_window = BattleWindow()
+    root_layout.add_widget(battle_window)
+    battle_window.opacity = 0  # 最初は非表示にしておく
 
 def load_enemy_status(enemy_id: str):
     """enemies_day4.json から敵ステータスを1体分読み込んで Status を返す想定。"""
