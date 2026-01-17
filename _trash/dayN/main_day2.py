@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-RPG Rustic Master B — Day2（生徒用）Kivy
-到達：壁衝突／Eで看板を読む（会話ダミー）
-発展：鍵と扉（Flagで開閉）／宝箱（取得でHUD）
+RPG Rustic Master B 窶・Day2・育函蠕堤畑・卯ivy
+蛻ｰ驕費ｼ壼｣∬｡晉ｪ・ｼ拾縺ｧ逵区攸繧定ｪｭ繧・井ｼ夊ｩｱ繝繝溘・・・
+逋ｺ螻包ｼ夐嵯縺ｨ謇会ｼ・lag縺ｧ髢矩哩・会ｼ丞ｮ晉ｮｱ・亥叙蠕励〒HUD・・
 """
 from kivy.app import App
 from kivy.uix.widget import Widget
@@ -12,9 +12,9 @@ from kivy.graphics import Color, Rectangle, PushMatrix, PopMatrix, Translate
 from kivy.uix.label import Label
 from kivy.properties import ListProperty
 from config import WIDTH, HEIGHT, TILE_SIZE, MAP_CSV, PLAYER_SPEED, BG
-from map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
+from field.map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
 
-def rect_collides(px, py, w, h, grid, solid={1,2,3,4}): # ← solid引数と壁タイルIDを追加
+def rect_collides(px, py, w, h, grid, solid={1,2,3,4}): # 竊・solid蠑墓焚縺ｨ螢√ち繧､繝ｫID繧定ｿｽ蜉
     ts = TILE_SIZE
     min_c = max(0, int(px)//ts)
     max_c = min(len(grid[0])-1, int((px+w-1))//ts)
@@ -22,7 +22,7 @@ def rect_collides(px, py, w, h, grid, solid={1,2,3,4}): # ← solid引数と壁�
     max_r = min(len(grid)-1, int((py+h-1))//ts)
     for r in range(min_r, max_r+1):
         for c in range(min_c, max_c+1):
-            if grid[r][c] in solid: # ← タイルIDが壁リストにあるかチェック
+            if grid[r][c] in solid: # 竊・繧ｿ繧､繝ｫID縺悟｣√Μ繧ｹ繝医↓縺ゅｋ縺九メ繧ｧ繝・け
                 wx, wy = c*ts, r*ts
                 if not (px+w<=wx or wx+ts<=px or py+h<=wy or wy+ts<=py):
                     return True
@@ -39,8 +39,8 @@ class Game(Widget):
         ts=TILE_SIZE
         self.px=ts*3; self.py=ts*3; self.w=ts-6; self.h=ts-6
         self.keys=set()
-        self.sign = (ts*10, ts*6, ts, ts)  # 看板の位置を設定
-        self.msg = Label(text="矢印キーで移動, E: 看板を読む", pos=(12,HEIGHT-28)) # HUDメッセージを設定
+        self.sign = (ts*10, ts*6, ts, ts)  # 逵区攸縺ｮ菴咲ｽｮ繧定ｨｭ螳・
+        self.msg = Label(text="遏｢蜊ｰ繧ｭ繝ｼ縺ｧ遘ｻ蜍・ E: 逵区攸繧定ｪｭ繧", pos=(12,HEIGHT-28)) # HUD繝｡繝・そ繝ｼ繧ｸ繧定ｨｭ螳・
         self.add_widget(self.msg)
 
         Window.bind(on_key_down=self._kd, on_key_up=self._ku)
@@ -63,13 +63,13 @@ class Game(Widget):
         ny=self.py+ay*spd
         if not rect_collides(self.px, ny, self.w, self.h, self.grid): self.py=ny
         
-        # 看板
+        # 逵区攸
         sx,sy,sw,sh=self.sign
         is_colliding_with_sign = not (self.px+self.w<=sx or sx+sw<=self.px or self.py+self.h<=sy or sy+sh<=self.py)
         if ekey in self.keys and is_colliding_with_sign:
-            self.msg.text="【看板】ようこそ、Rustic村へ！"
+            self.msg.text="縲千恚譚ｿ縲代ｈ縺・％縺昴ヽustic譚代∈・・
         else:
-            self.msg.text="矢印キーで移動, E: 看板を読む"
+            self.msg.text="遏｢蜊ｰ繧ｭ繝ｼ縺ｧ遘ｻ蜍・ E: 逵区攸繧定ｪｭ繧"
         
         self.cam[0]=max(0,self.px-self.width/2); self.cam[1]=max(0,self.py-self.height/2)
         self.draw()
@@ -83,13 +83,13 @@ class Game(Widget):
             for r,row in enumerate(self.grid):
                 for c,tid in enumerate(row):
                     Rectangle(texture=self.tiles[tid], pos=(c*ts,r*ts), size=(ts,ts))
-            # 看板
+            # 逵区攸
             Color(0.8,0.6,0.25,1); Rectangle(pos=(self.sign[0],self.sign[1]), size=(self.sign[2],self.sign[3]))
-            # プレイヤ
+            # 繝励Ξ繧､繝､
             Color(0.35,0.67,1,1); Rectangle(pos=(self.px,self.py), size=(self.w,self.h))
             PopMatrix()
 class Day2(App):
     def build(self): return Game()
 if __name__=="__main__": Day2().run()
 
-#看板の文字の表示ができなかった。
+#逵区攸縺ｮ譁・ｭ励・陦ｨ遉ｺ縺後〒縺阪↑縺九▲縺溘

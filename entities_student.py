@@ -1,13 +1,13 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-RPG Rustic Master B — Day2（生徒用）Kivy
-到達：壁衝突／Eで看板を読む（会話ダミー）
-発展：走る(Shift)／スタミナ／慣性／摩擦／宝箱／鍵と扉
+RPG Rustic Master B 窶・Day2・育函蠕堤畑・卯ivy
+蛻ｰ驕費ｼ壼｣∬｡晉ｪ・ｼ拾縺ｧ逵区攸繧定ｪｭ繧・井ｼ夊ｩｱ繝繝溘・・・
+逋ｺ螻包ｼ夊ｵｰ繧・Shift)・上せ繧ｿ繝溘リ・乗・諤ｧ・乗束謫ｦ・丞ｮ晉ｮｱ・城嵯縺ｨ謇・
 
-ポイント（Kivy版の“pygame風”分割）
-- Player : 入力→速度→移動（衝突は軸分離）
-- Camera : プレイヤー追従（offset = cam）
-- HUD    : 画面固定（Windowサイズに追従して、絶対に見える）
+繝昴う繝ｳ繝茨ｼ・ivy迚医・窶徘ygame鬚ｨ窶晏・蜑ｲ・・
+- Player : 蜈･蜉帚・騾溷ｺｦ竊堤ｧｻ蜍包ｼ郁｡晉ｪ√・霆ｸ蛻・屬・・
+- Camera : 繝励Ξ繧､繝､繝ｼ霑ｽ蠕難ｼ・ffset = cam・・
+- HUD    : 逕ｻ髱｢蝗ｺ螳夲ｼ・indow繧ｵ繧､繧ｺ縺ｫ霑ｽ蠕薙＠縺ｦ縲∫ｵｶ蟇ｾ縺ｫ隕九∴繧具ｼ・
 """
 
 from kivy.app import App
@@ -19,32 +19,32 @@ from kivy.uix.label import Label
 from kivy.properties import ListProperty
 
 from config import WIDTH, HEIGHT, TILE_SIZE, MAP_CSV, PLAYER_SPEED, BG
-from map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
+from field.map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
 
-# ✅ HUDが画面外に飛ぶ事故を防止（WidgetサイズではなくWindowサイズを固定）
+# 笨・HUD縺檎判髱｢螟悶↓鬟帙・莠区腐繧帝亟豁｢・・idget繧ｵ繧､繧ｺ縺ｧ縺ｯ縺ｪ縺集indow繧ｵ繧､繧ｺ繧貞崋螳夲ｼ・
 Window.size = (WIDTH, HEIGHT)
 
-# --- 追加要素（configに無い前提で、ここで“講義用に”定数化） ---
-RUN_MULTIPLIER = 1.8       # Shiftで走る倍率
-STAMINA_MAX = 100.0        # スタミナ最大
-STAMINA_RUN_COST = 0.9     # 走行中の減少（毎フレーム）
-STAMINA_RECOVER = 0.6      # 非走行時の回復（毎フレーム）
-PLAYER_ACCEL = 0.25        # 慣性の追従率（0〜1）
-PLAYER_FRICTION = 0.88     # 摩擦（0〜1、1に近いほど滑る）
+# --- 霑ｽ蜉隕∫ｴ・・onfig縺ｫ辟｡縺・燕謠舌〒縲√％縺薙〒窶懆ｬ帷ｾｩ逕ｨ縺ｫ窶晏ｮ壽焚蛹厄ｼ・---
+RUN_MULTIPLIER = 1.8       # Shift縺ｧ襍ｰ繧句咲紫
+STAMINA_MAX = 100.0        # 繧ｹ繧ｿ繝溘リ譛螟ｧ
+STAMINA_RUN_COST = 0.9     # 襍ｰ陦御ｸｭ縺ｮ貂帛ｰ托ｼ域ｯ弱ヵ繝ｬ繝ｼ繝・・
+STAMINA_RECOVER = 0.6      # 髱櫁ｵｰ陦梧凾縺ｮ蝗槫ｾｩ・域ｯ弱ヵ繝ｬ繝ｼ繝・・
+PLAYER_ACCEL = 0.25        # 諷｣諤ｧ縺ｮ霑ｽ蠕鍋紫・・縲・・・
+PLAYER_FRICTION = 0.88     # 鞫ｩ謫ｦ・・縲・縲・縺ｫ霑代＞縺ｻ縺ｩ貊代ｋ・・
 
-SOLID_TILES = {1, 2, 3, 4} # 壁扱いタイルID（必要に応じて調整）
+SOLID_TILES = {1, 2, 3, 4} # 螢∵桶縺・ち繧､繝ｫID・亥ｿ・ｦ√↓蠢懊§縺ｦ隱ｿ謨ｴ・・
 
 def rect_collides(px, py, w, h, grid, solid=SOLID_TILES):
     """
-    タイル衝突（矩形 vs 壁タイル）判定
-    - px,py,w,h は “ワールド座標（ピクセル）”
-    - grid は CSVのタイルID配列（grid[row][col]）
+    繧ｿ繧､繝ｫ陦晉ｪ・ｼ育洸蠖｢ vs 螢√ち繧､繝ｫ・牙愛螳・
+    - px,py,w,h 縺ｯ 窶懊Ρ繝ｼ繝ｫ繝牙ｺｧ讓呻ｼ医ヴ繧ｯ繧ｻ繝ｫ・俄・
+    - grid 縺ｯ CSV縺ｮ繧ｿ繧､繝ｫID驟榊・・・rid[row][col]・・
     """
     ts = TILE_SIZE
     cols = len(grid[0])
     rows = len(grid)
 
-    # プレイヤー矩形が占めるタイル範囲だけ調べる（高速）
+    # 繝励Ξ繧､繝､繝ｼ遏ｩ蠖｢縺悟頃繧√ｋ繧ｿ繧､繝ｫ遽・峇縺縺題ｪｿ縺ｹ繧具ｼ磯ｫ倬滂ｼ・
     min_c = max(0, int(px) // ts)
     max_c = min(cols - 1, int((px + w - 1)) // ts)
     min_r = max(0, int(py) // ts)
@@ -54,13 +54,13 @@ def rect_collides(px, py, w, h, grid, solid=SOLID_TILES):
         for c in range(min_c, max_c + 1):
             if grid[r][c] in solid:
                 wx, wy = c * ts, r * ts
-                # AABB（矩形）の重なり
+                # AABB・育洸蠖｢・峨・驥阪↑繧・
                 if not (px + w <= wx or wx + ts <= px or py + h <= wy or wy + ts <= py):
                     return True
     return False
 
 def aabb_intersect(ax, ay, aw, ah, bx, by, bw, bh):
-    """矩形どうし（AABB）の重なり判定"""
+    """遏ｩ蠖｢縺ｩ縺・＠・・ABB・峨・驥阪↑繧雁愛螳・""
     if ax + aw <= bx: return False
     if ax >= bx + bw: return False
     if ay + ah <= by: return False
@@ -69,9 +69,9 @@ def aabb_intersect(ax, ay, aw, ah, bx, by, bw, bh):
 
 class Player:
     """
-    Player（pygame風の責務）
-    - handle_input : 入力→目標速度→慣性＆摩擦
-    - move_and_collide : 移動（軸分離で衝突）
+    Player・・ygame鬚ｨ縺ｮ雋ｬ蜍呻ｼ・
+    - handle_input : 蜈･蜉帚・逶ｮ讓咎溷ｺｦ竊呈・諤ｧ・・束謫ｦ
+    - move_and_collide : 遘ｻ蜍包ｼ郁ｻｸ蛻・屬縺ｧ陦晉ｪ・ｼ・
     """
     def __init__(self, x, y, w, h):
         self.px = float(x)
@@ -79,32 +79,32 @@ class Player:
         self.w = float(w)
         self.h = float(h)
 
-        # 速度（慣性）
+        # 騾溷ｺｦ・域・諤ｧ・・
         self.vx = 0.0
         self.vy = 0.0
 
-        # スタミナ
+        # 繧ｹ繧ｿ繝溘リ
         self.stamina = STAMINA_MAX
 
     def handle_input(self, keys, mods):
         """
-        keys: 押されているキーコード集合
-        mods: 修飾キー集合（'shift'等） ※環境差があるのでShiftキーコードも併用
+        keys: 謚ｼ縺輔ｌ縺ｦ縺・ｋ繧ｭ繝ｼ繧ｳ繝ｼ繝蛾寔蜷・
+        mods: 菫ｮ鬟ｾ繧ｭ繝ｼ髮・粋・・shift'遲会ｼ・窶ｻ迺ｰ蠅・ｷｮ縺後≠繧九・縺ｧShift繧ｭ繝ｼ繧ｳ繝ｼ繝峨ｂ菴ｵ逕ｨ
         """
         left = 276; right = 275; up = 273; down = 274
         ax = (1 if right in keys else 0) - (1 if left in keys else 0)
         ay = (1 if down  in keys else 0) - (1 if up   in keys else 0)
 
-        # 斜め移動を速くしない（正規化）
+        # 譁懊ａ遘ｻ蜍輔ｒ騾溘￥縺励↑縺・ｼ域ｭ｣隕丞喧・・
         if ax != 0 and ay != 0:
             ax *= 0.7071
             ay *= 0.7071
 
-        # Shift走り（modifierが取れない環境の保険：303/304）
+        # Shift襍ｰ繧奇ｼ・odifier縺悟叙繧後↑縺・腸蠅・・菫晞匱・・03/304・・
         shift_keys = {303, 304}
         running = ('shift' in mods) or any(k in keys for k in shift_keys)
 
-        # 走り＆スタミナ
+        # 襍ｰ繧奇ｼ・せ繧ｿ繝溘リ
         speed = PLAYER_SPEED
         if running and self.stamina > 0:
             speed *= RUN_MULTIPLIER
@@ -112,29 +112,29 @@ class Player:
         else:
             self.stamina = min(STAMINA_MAX, self.stamina + STAMINA_RECOVER)
 
-        # 慣性（目標速度に“なめらかに”追従）
+        # 諷｣諤ｧ・育岼讓咎溷ｺｦ縺ｫ窶懊↑繧√ｉ縺九↓窶晁ｿｽ蠕難ｼ・
         target_vx = ax * speed
         target_vy = ay * speed
         self.vx = self.vx * (1.0 - PLAYER_ACCEL) + target_vx * PLAYER_ACCEL
         self.vy = self.vy * (1.0 - PLAYER_ACCEL) + target_vy * PLAYER_ACCEL
 
-        # 摩擦（入力が切れた時に少しずつ止まる）
+        # 鞫ｩ謫ｦ・亥・蜉帙′蛻・ｌ縺滓凾縺ｫ蟆代＠縺壹▽豁｢縺ｾ繧具ｼ・
         self.vx *= PLAYER_FRICTION
         self.vy *= PLAYER_FRICTION
 
     def move_and_collide(self, grid):
         """
-        軸分離（超重要）
-        - Xを動かす→衝突したら巻き戻す
-        - Yを動かす→衝突したら巻き戻す
-        こうすると“角で引っかかってガタガタ”が減ります
+        霆ｸ蛻・屬・郁ｶ・㍾隕・ｼ・
+        - X繧貞虚縺九☆竊定｡晉ｪ√＠縺溘ｉ蟾ｻ縺肴綾縺・
+        - Y繧貞虚縺九☆竊定｡晉ｪ√＠縺溘ｉ蟾ｻ縺肴綾縺・
+        縺薙≧縺吶ｋ縺ｨ窶懆ｧ偵〒蠑輔▲縺九°縺｣縺ｦ繧ｬ繧ｿ繧ｬ繧ｿ窶昴′貂帙ｊ縺ｾ縺・
         """
         # X
         nx = self.px + self.vx
         if not rect_collides(nx, self.py, self.w, self.h, grid):
             self.px = nx
         else:
-            self.vx = 0.0  # 壁に当たったらX速度を止める（わかりやすい）
+            self.vx = 0.0  # 螢√↓蠖薙◆縺｣縺溘ｉX騾溷ｺｦ繧呈ｭ｢繧√ｋ・医ｏ縺九ｊ繧・☆縺・ｼ・
 
         # Y
         ny = self.py + self.vy
@@ -148,7 +148,7 @@ class Player:
 
 
 class Camera:
-    """プレイヤー中心追従カメラ（offset = cam）"""
+    """繝励Ξ繧､繝､繝ｼ荳ｭ蠢・ｿｽ蠕薙き繝｡繝ｩ・・ffset = cam・・""
     def __init__(self, screen_w, screen_h, map_w, map_h):
         self.cam = [0.0, 0.0]
         self.sw = screen_w
@@ -167,9 +167,9 @@ class Camera:
 
 class HUD:
     """
-    画面固定HUD
-    - “看板の文字”は、看板の上に描くのではなくHUDに出す（RPG定番）
-    - Windowサイズが変わっても絶対に見えるように追従させる
+    逕ｻ髱｢蝗ｺ螳唏UD
+    - 窶懃恚譚ｿ縺ｮ譁・ｭ冷昴・縲∫恚譚ｿ縺ｮ荳翫↓謠上￥縺ｮ縺ｧ縺ｯ縺ｪ縺秋UD縺ｫ蜃ｺ縺呻ｼ・PG螳夂分・・
+    - Window繧ｵ繧､繧ｺ縺悟､峨ｏ縺｣縺ｦ繧らｵｶ蟇ｾ縺ｫ隕九∴繧九ｈ縺・↓霑ｽ蠕薙＆縺帙ｋ
     """
     def __init__(self):
         self.label = Label(text="", pos=(12, Window.height - 28))
@@ -189,11 +189,11 @@ class Game(Widget):
         super().__init__(**kw)
         self.size = (WIDTH, HEIGHT)
 
-        # マップ読み込み
+        # 繝槭ャ繝苓ｪｭ縺ｿ霎ｼ縺ｿ
         self.grid, self.rows, self.cols = load_csv_as_tilemap(MAP_CSV)
         self.tiles = load_tileset_regions()
 
-        # マップサイズ（ピクセル）
+        # 繝槭ャ繝励し繧､繧ｺ・医ヴ繧ｯ繧ｻ繝ｫ・・
         self.map_w = self.cols * TILE_SIZE
         self.map_h = self.rows * TILE_SIZE
 
@@ -205,15 +205,15 @@ class Game(Widget):
         self.hud = HUD()
         self.add_widget(self.hud.label)
 
-        # 入力状態
+        # 蜈･蜉帷憾諷・
         self.keys = set()
         self.mods = set()
         Window.bind(on_key_down=self._kd, on_key_up=self._ku)
 
-        # 看板（オレンジ四角）＝“当たり判定の目印”
+        # 逵区攸・医が繝ｬ繝ｳ繧ｸ蝗幄ｧ抵ｼ会ｼ昶懷ｽ薙◆繧雁愛螳壹・逶ｮ蜊ｰ窶・
         self.sign = (ts * 10, ts * 6, ts, ts)
-        self.sign_text = "ようこそ、Rustic村へ！"
-        self.sign_hold = 0.0  # 表示保持（チラつき防止）
+        self.sign_text = "繧医≧縺薙◎縲ヽustic譚代∈・・
+        self.sign_hold = 0.0  # 陦ｨ遉ｺ菫晄戟・医メ繝ｩ縺､縺埼亟豁｢・・
 
         Clock.schedule_interval(self.update, 1 / 60)
 
@@ -227,11 +227,11 @@ class Game(Widget):
         return True
 
     def update(self, dt):
-        # 入力→移動
+        # 蜈･蜉帚・遘ｻ蜍・
         self.player.handle_input(self.keys, self.mods)
         self.player.move_and_collide(self.grid)
 
-        # 看板：Eで読む（接触中のみ）
+        # 逵区攸・哘縺ｧ隱ｭ繧・域磁隗ｦ荳ｭ縺ｮ縺ｿ・・
         ekey = ord('e')  # 101
         px, py, pw, ph = self.player.rect()
         sx, sy, sw, sh = self.sign
@@ -241,16 +241,16 @@ class Game(Widget):
 
         if (ekey in self.keys) and touching:
             self.sign_hold = 0.20
-            hud_text = f"矢印で移動 / Shiftで走る / E: 看板\n【看板】{self.sign_text}"
+            hud_text = f"遏｢蜊ｰ縺ｧ遘ｻ蜍・/ Shift縺ｧ襍ｰ繧・/ E: 逵区攸\n縲千恚譚ｿ縲捜self.sign_text}"
         else:
             if self.sign_hold > 0.0:
-                hud_text = f"矢印で移動 / Shiftで走る / E: 看板\n【看板】{self.sign_text}"
+                hud_text = f"遏｢蜊ｰ縺ｧ遘ｻ蜍・/ Shift縺ｧ襍ｰ繧・/ E: 逵区攸\n縲千恚譚ｿ縲捜self.sign_text}"
             else:
-                hud_text = "矢印で移動 / Shiftで走る / E: 看板"
+                hud_text = "遏｢蜊ｰ縺ｧ遘ｻ蜍・/ Shift縺ｧ襍ｰ繧・/ E: 逵区攸"
 
         self.hud.set_text(hud_text)
 
-        # カメラ追従（プレイヤー中心）
+        # 繧ｫ繝｡繝ｩ霑ｽ蠕難ｼ医・繝ｬ繧､繝､繝ｼ荳ｭ蠢・ｼ・
         self.camera.follow(px, py)
         self.cam[0], self.cam[1] = self.camera.cam[0], self.camera.cam[1]
 
@@ -259,11 +259,11 @@ class Game(Widget):
     def draw(self):
         self.canvas.clear()
         with self.canvas:
-            # 背景
+            # 閭梧勹
             Color(*BG)
             Rectangle(pos=self.pos, size=self.size)
 
-            # ワールド描画（カメラ適用）
+            # 繝ｯ繝ｼ繝ｫ繝画緒逕ｻ・医き繝｡繝ｩ驕ｩ逕ｨ・・
             PushMatrix()
             Translate(-self.cam[0], -self.cam[1], 0)
 
@@ -272,11 +272,11 @@ class Game(Widget):
                 for c, tid in enumerate(row):
                     Rectangle(texture=self.tiles[tid], pos=(c * ts, r * ts), size=(ts, ts))
 
-            # 看板（オレンジ）
+            # 逵区攸・医が繝ｬ繝ｳ繧ｸ・・
             Color(0.8, 0.6, 0.25, 1)
             Rectangle(pos=(self.sign[0], self.sign[1]), size=(self.sign[2], self.sign[3]))
 
-            # プレイヤ
+            # 繝励Ξ繧､繝､
             Color(0.35, 0.67, 1, 1)
             px, py, pw, ph = self.player.rect()
             Rectangle(pos=(px, py), size=(pw, ph))
@@ -284,14 +284,14 @@ class Game(Widget):
             PopMatrix()
 class NPC:
     def __init__(self, name, x, y, event_id):
-        # name: NPCの名前（例: "村人A"）
-        # x, y: マップ上のタイル座標
-        # event_id: 会話イベントのID（例: "first_npc"）
+        # name: NPC縺ｮ蜷榊燕・井ｾ・ "譚台ｺｺA"・・
+        # x, y: 繝槭ャ繝嶺ｸ翫・繧ｿ繧､繝ｫ蠎ｧ讓・
+        # event_id: 莨夊ｩｱ繧､繝吶Φ繝医・ID・井ｾ・ "first_npc"・・
         self.name = name
         self.x = x
         self.y = y
         self.event_id = event_id
-villager1 = NPC("村人１",12,5,event_id ="1")
+villager1 = NPC("譚台ｺｺ・・,12,5,event_id ="1")
 
 
 class Day2(App):
@@ -300,7 +300,7 @@ class Day2(App):
 
 
 def is_adjacent(player, npc):
-    # プレイヤーがNPCの上下左右どこか1マス隣にいるかどうかを返す。
+    # 繝励Ξ繧､繝､繝ｼ縺君PC縺ｮ荳贋ｸ句ｷｦ蜿ｳ縺ｩ縺薙°1繝槭せ髫｣縺ｫ縺・ｋ縺九←縺・°繧定ｿ斐☆縲・
     dx = abs(player.x - npc.x)
     dy = abs(player.y - npc.y)
     return dx + dy == 1

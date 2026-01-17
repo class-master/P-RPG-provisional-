@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 WIDTH, HEIGHT = 960, 540
 TILE_SIZE = 32
 TILESET_COLUMNS = 8
