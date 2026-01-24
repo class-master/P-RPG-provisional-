@@ -1,10 +1,10 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-P-RPG provisional - main.py (邨ｱ蜷育沿繧ｨ繝ｳ繝医Μ)
-蛻ｰ驕費ｼ・
-- 繝輔ぅ繝ｼ繝ｫ繝臥ｧｻ蜍包ｼ・ay2繝吶・繧ｹ・夊｡晉ｪ√≠繧奇ｼ・
-- 逵区攸・・縺ｧ隱ｭ繧・・
-- E縺ｧ謌ｦ髣倥↓蜈･繧具ｼ域圻螳夲ｼ壹ユ繧ｹ繝医お繝ｳ繧ｫ繧ｦ繝ｳ繝茨ｼ・
+P-RPG provisional - main.py (統合版エントリ)
+到達：
+- フィールド移動（day2ベース：衝突判定あり）
+- 看板：Eで読む
+- Eで戦闘に入る（暫定：テストエンカウント）
 """
 
 from __future__ import annotations
@@ -24,17 +24,17 @@ from kivy.properties import ListProperty
 
 from config import WIDTH, HEIGHT, TILE_SIZE, MAP_CSV, PLAYER_SPEED, BG
 
-# 笨・豁｣隕擾ｼ咾SV繝槭ャ繝苓ｪｭ縺ｿ霎ｼ縺ｿ・・oad_map 縺ｯ菴ｿ繧上↑縺・ｼ・
+# ※ 修正：CSVマップ読み込み（load_map は使わない）
 from field.map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
 
-# 笨・豁｣隕擾ｼ壹ヰ繝医Ν髢｢騾｣・育ｧｻ蜍募ｾ後・繝代せ・・
+# ※ 修正：バトル関連（移動後のパス）
 from status_day4 import Status
 from ui.battle_window import BattleWindow
 from systems.battle.battle_engine import player_attack, enemy_attack
 
 
 # ============================================================
-# 陦晉ｪ∝愛螳夲ｼ・ay2繝吶・繧ｹ・・
+# 衝突判定（day2ベース）
 # ============================================================
 def rect_collides(px, py, w, h, grid, solid={1, 2, 3, 4}):
     ts = TILE_SIZE
@@ -77,18 +77,18 @@ class Game(Widget):
         self.keys = set()
 
         # --- HUD / sign ---
-        self.sign = (ts * 10, ts * 6, ts, ts)  # x,y,w,h・井ｾ具ｼ・
-        self.msg = Label(text="遏｢蜊ｰ:遘ｻ蜍・/ E:逵区攸 / B:謌ｦ髣倥ユ繧ｹ繝・, pos=(12, HEIGHT - 28))
+        self.sign = (ts * 10, ts * 6, ts, ts)  # x,y,w,h（例）
+        self.msg = Label(text="矢印:移動 / E:看板 / B:戦闘テスト", pos=(12, HEIGHT - 28))
         self.add_widget(self.msg)
 
         # --- battle state ---
         self.mode = "field"  # "field" / "battle"
-        self.player_status = Status("繧・≧縺励ｃ", max_hp=30, attack=8, defense=2)
+        self.player_status = Status("ゆうしゃ", max_hp=30, attack=8, defense=2)
         self.enemy_status: Optional[Status] = None
 
         self.battle_window = BattleWindow()
         self.root_layout.add_widget(self.battle_window)
-        self.battle_window.opacity = 0.0  # 髱櫁｡ｨ遉ｺ
+        self.battle_window.opacity = 0.0  # 非表示
 
         Window.bind(on_key_down=self._kd, on_key_up=self._ku)
         Clock.schedule_interval(self.update, 1 / 60)
@@ -98,8 +98,8 @@ class Game(Widget):
     # -----------------------------
     def _kd(self, win, key, scancode, codepoint, modifier):
         self.keys.add(key)
-        # 譁ｹ蜷代く繝ｼ/譁・ｭ励く繝ｼ蛻､螳夂畑縺ｫ codepoint 繧よ桶縺医ｋ縺後・
-        # 縺ｾ縺壹・ keycode 縺ｧ譛菴朱剞蜍輔°縺・
+        # 方向キー/文字キー判定用に codepoint も使えるが、
+        # まずは keycode で最低限動かす。
         return True
 
     def _ku(self, win, key, scancode):
@@ -110,7 +110,7 @@ class Game(Widget):
     # battle helpers
     # -----------------------------
     def load_enemy_status(self, enemy_id: str) -> Status:
-        # 笨・data/input 縺ｫ遘ｻ蜍輔＠縺滓Φ螳・
+        # ※ data/input に移動した想定
         data_path = Path("data/input/enemies_day4.json")
         data = json.loads(data_path.read_text(encoding="utf-8"))
         info = data[enemy_id]
@@ -125,7 +125,7 @@ class Game(Widget):
         self.enemy_status = self.load_enemy_status(enemy_id)
         self.mode = "battle"
         self.battle_window.update_status(self.player_status, self.enemy_status)
-        self.battle_window.show_message(f"{self.enemy_status.name} 縺後≠繧峨ｏ繧後◆・・)
+        self.battle_window.show_message(f"{self.enemy_status.name} があらわれた！")
         self.battle_window.opacity = 1.0
 
     def end_battle(self, message: str) -> None:
@@ -135,8 +135,8 @@ class Game(Widget):
         self.mode = "field"
 
     def handle_battle_key(self, keycode: int) -> None:
-        # A繧ｭ繝ｼ・・7・育腸蠅・ｷｮ縺ゅｊ・峨ゅ％縺薙・ 窶廝縺ｧ謾ｻ謦・・縺ｫ縺励※螳牙ｮ壹＆縺帙ｋ縺ｮ繧よ焔縲・
-        # 縺ｾ縺壹・ keycode 98 = 'b' 縺ｧ謾ｻ謦・↓縺励※縺・∪縺吶・
+        # Aキー＝97（環境差あり）。ここでは 'b'で攻撃 にして安定させるのも手。
+        # まずは keycode 98 = 'b' で攻撃にしています。
         if keycode != 98:
             return
         if self.enemy_status is None:
@@ -146,32 +146,32 @@ class Game(Widget):
         dmg = player_attack(self.player_status, self.enemy_status)
         self.battle_window.update_status(self.player_status, self.enemy_status)
         self.battle_window.show_message(
-            f"{self.player_status.name}縺ｮ縺薙≧縺偵″・・{self.enemy_status.name}縺ｫ {dmg} 繝繝｡繝ｼ繧ｸ・・
+            f"{self.player_status.name}のこうげき！{self.enemy_status.name}に {dmg} ダメージ！"
         )
         if self.enemy_status.is_dead():
-            self.end_battle(f"{self.enemy_status.name}繧・縺溘♀縺励◆・・)
+            self.end_battle(f"{self.enemy_status.name}を たおした！")
             return
 
         # 2) enemy attack
         dmg2 = enemy_attack(self.enemy_status, self.player_status)
         self.battle_window.update_status(self.player_status, self.enemy_status)
         self.battle_window.show_message(
-            f"{self.enemy_status.name}縺ｮ縺薙≧縺偵″・・{self.player_status.name}縺ｯ {dmg2} 繝繝｡繝ｼ繧ｸ・・
+            f"{self.enemy_status.name}のこうげき！{self.player_status.name}は {dmg2} ダメージ！"
         )
         if self.player_status.is_dead():
-            # 繝ｬ繝吶Ν荳翫￡辟｡縺玲婿驥晢ｼ壽風蛹玲凾縺ｯ蜈ｨ蝗槫ｾｩ縺ｧ蜊ｳ謌ｻ縺・
+            # レベル上げ無し方針：敗北時は全回復で即復活。
             self.player_status.hp = self.player_status.max_hp
-            self.end_battle("繧・ｉ繧後※縺励∪縺｣縺溪ｦ窶ｦ・・P蜈ｨ蝗槫ｾｩ縺ｧ蟶ｰ驍・ｼ・)
+            self.end_battle("やられてしまった……HP全回復で帰還します！")
 
     # -----------------------------
     # update loop
     # -----------------------------
     def update(self, dt):
         if self.mode == "battle":
-            # 繝舌ヨ繝ｫ荳ｭ縺ｯ謫堺ｽ懊ｒ繝舌ヨ繝ｫ縺ｫ蝗ｺ螳・
-            # 'b' 縺ｧ謾ｻ謦・ｼ・eycode=98・・
+            # バトル中は操作をバトルに固定
+            # 'b' で攻撃（keycode=98）
             if 98 in self.keys:
-                # 謚ｼ縺励▲縺ｱ縺ｪ縺鈴｣謇薙↓縺ｪ繧九・縺ｧ縲・蝗槫・逅・＠縺溘ｉ豸医☆
+                # 押しっぱなし連打になるので、一回処理したら消す
                 self.keys.discard(98)
                 self.handle_battle_key(98)
             return
@@ -179,7 +179,7 @@ class Game(Widget):
         # --- field mode ---
         left, right, down, up = 276, 275, 273, 274
         ekey = 101  # 'e'
-        bkey = 98   # 'b'・域姶髣倥ユ繧ｹ繝育畑・・
+        bkey = 98   # 'b'（戦闘テスト用）
 
         ax = (1 if right in self.keys else 0) - (1 if left in self.keys else 0)
         ay = (1 if down in self.keys else 0) - (1 if up in self.keys else 0)
@@ -192,18 +192,18 @@ class Game(Widget):
         if not rect_collides(self.px, ny, self.w, self.h, self.grid):
             self.py = ny
 
-        # 逵区攸
+        # 看板
         sx, sy, sw, sh = self.sign
         is_sign = not (self.px + self.w <= sx or sx + sw <= self.px or self.py + self.h <= sy or sy + sh <= self.py)
         if ekey in self.keys and is_sign:
-            self.msg.text = "縲千恚譚ｿ縲代ｈ縺・％縺晢ｼ・E=逵区攸 / B=謌ｦ髣倥ユ繧ｹ繝・
+            self.msg.text = "【看板】ようこそ！ E=看板 / B=戦闘テスト"
         else:
-            self.msg.text = "遏｢蜊ｰ:遘ｻ蜍・/ E:逵区攸 / B:謌ｦ髣倥ユ繧ｹ繝・
+            self.msg.text = "矢印:移動 / E:看板 / B:戦闘テスト"
 
-        # 謌ｦ髣倥ユ繧ｹ繝茨ｼ医＞縺｣縺溘ｓ繧ｭ繝ｼ縺ｧ蜈･繧後ｋ・・
+        # 戦闘テスト（いったんキーで入れる）
         if bkey in self.keys:
             self.keys.discard(bkey)
-            # enemies_day4.json 縺ｫ蟄伜惠縺吶ｋID縺ｸ・井ｾ具ｼ嘖lime・・
+            # enemies_day4.json に存在するIDへ（例：slime）
             self.start_battle("slime")
 
         # camera
@@ -226,11 +226,11 @@ class Game(Widget):
                 for c, tid in enumerate(row):
                     Rectangle(texture=self.tiles[tid], pos=(c * ts, r * ts), size=(ts, ts))
 
-            # 逵区攸・郁ｦ九∴繧句喧・・
+            # 看板（見える化）
             Color(0.8, 0.6, 0.25, 1)
             Rectangle(pos=(self.sign[0], self.sign[1]), size=(self.sign[2], self.sign[3]))
 
-            # 繝励Ξ繧､繝､繝ｼ
+            # プレイヤー
             Color(0.35, 0.67, 1, 1)
             Rectangle(pos=(self.px, self.py), size=(self.w, self.h))
 
