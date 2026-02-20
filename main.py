@@ -28,7 +28,7 @@ from config import WIDTH, HEIGHT, TILE_SIZE, MAP_CSV, PLAYER_SPEED, BG
 from field.map_loader_kivy import load_csv_as_tilemap, load_tileset_regions
 
 # ※ 修正：バトル関連（移動後のパス）
-from status_day4 import Status
+from entities.status import Status
 from ui.battle_window import BattleWindow
 from systems.battle.battle_engine import player_attack, enemy_attack
 
